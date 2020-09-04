@@ -70,4 +70,5 @@ jobs:
                   --instance-os-user $AWS_INSTANCE_OS_USER \
                  --ssh-public-key file://aws_key.pub &&
                 rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i aws_key" \
-                  -arvz --delete ./ ec2-user@neighborly.tools:/var/www/neighborly.tools/server/
+                  -arvz --delete ./ ec2-user@neighborly.tools:/var/www/neighborly.tools/server/ &&
+                ssh -i aws_key -o StrictHostKeyChecking=no ec2-user@neighborly.tools bash -c "'sudo supervisorctl restart neighborly:*'"
