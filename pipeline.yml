@@ -106,7 +106,7 @@ jobs:
             - name: neighborly-server-qa
           outputs:
             - name: server
-              path: git
+              path: neighborly-server-qa
           params:
             NEIGHBORLY_ENV: ((neighborly_env))
           run:
@@ -144,7 +144,7 @@ jobs:
                 apk update &&
                 apk add rsync openssh-client aws-cli &&
                 ssh-keygen -t rsa -f aws_key -q -N "" &&
-                chmod 600 aws_key &&
+                chmod 400 aws_key &&
                 aws ec2-instance-connect send-ssh-public-key \
                   --region $AWS_REGION \
                   --instance-id $AWS_INSTANCE_ID \

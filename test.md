@@ -1,0 +1,58 @@
+- name: deploy-server-to-dev
+  serial: true
+  plan:
+  - get: git
+    trigger: true
+  - task: build
+    config:
+    platform: linux
+    image_resource:
+    type: docker-image
+    source:
+    repository: node
+    tag: alpine
+    inputs: - name: git
+    outputs: - name: server
+    path: git
+    params:
+    NEIGHBORLY_ENV: ((neighborly_env))
+    run:
+    path: /bin/sh
+    args: - -c - |
+    cd git &&
+    npm i &&
+    echo "\$NEIGHBORLY_ENV" >> .env
+  - task: deploy
+    config:
+    platform: linux
+    image_resource:
+    type: docker-image
+    source:
+    repository: alpine
+    tag: edge
+    inputs: - name: server
+    path: .
+    params:
+    AWS_ACCESS_KEY_ID: ((AWS_ACCESS_KEY_ID))
+    AWS_SECRET_ACCESS_KEY: ((AWS_SECRET_ACCESS_KEY))
+    AWS_DEFAULT_REGION: ((AWS_DEFAULT_REGION))
+    AWS_REGION: ((AWS_REGION))
+    AWS_INSTANCE_ID: ((AWS_INSTANCE_ID))
+    AWS_AVAILABILITY_ZONE: ((AWS_AVAILABILITY_ZONE))
+    AWS_INSTANCE_OS_USER: ((AWS_INSTANCE_OS_USER))
+    run:
+    path: /bin/sh
+    args: - -c - |
+    apk update &&
+    apk add rsync openssh-client aws-cli &&
+    ssh-keygen -t rsa -f aws_key -q -N "" &&
+    chmod 600 aws_key &&
+    aws ec2-instance-connect send-ssh-public-key \
+     --region $AWS_REGION \
+                  --instance-id $AWS_INSTANCE_ID \
+     --availability-zone $AWS_AVAILABILITY_ZONE \
+                  --instance-os-user $AWS_INSTANCE_OS_USER \
+     --ssh-public-key file://aws_key.pub &&
+    rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i aws_key" \
+     -arvz --delete ./ ec2-user@neighborly.tools:/var/www/neighborly.tools/server/ &&
+    ssh -i aws_key -o StrictHostKeyChecking=no ec2-user@neighborly.tools bash -c "'sudo supervisorctl restart neighborly:\*'"
