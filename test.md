@@ -1,7 +1,7 @@
-- name: deploy-server-to-dev
+- name: deploy-server-to-qa
   serial: true
   plan:
-  - get: git
+  - get: neighborly-server-qa
     trigger: true
   - task: build
     config:
@@ -11,15 +11,15 @@
     source:
     repository: node
     tag: alpine
-    inputs: - name: git
+    inputs: - name: neighborly-server-qa
     outputs: - name: server
-    path: git
+    path: neighborly-server-qa
     params:
     NEIGHBORLY_ENV: ((neighborly_env))
     run:
     path: /bin/sh
     args: - -c - |
-    cd git &&
+    cd neighborly-server-qa &&
     npm i &&
     echo "\$NEIGHBORLY_ENV" >> .env
   - task: deploy
@@ -46,7 +46,7 @@
     apk update &&
     apk add rsync openssh-client aws-cli &&
     ssh-keygen -t rsa -f aws_key -q -N "" &&
-    chmod 600 aws_key &&
+    chmod 400 aws_key &&
     aws ec2-instance-connect send-ssh-public-key \
      --region $AWS_REGION \
                   --instance-id $AWS_INSTANCE_ID \
@@ -54,5 +54,5 @@
                   --instance-os-user $AWS_INSTANCE_OS_USER \
      --ssh-public-key file://aws_key.pub &&
     rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i aws_key" \
-     -arvz --delete ./ ec2-user@neighborly.tools:/var/www/neighborly.tools/server/ &&
-    ssh -i aws_key -o StrictHostKeyChecking=no ec2-user@neighborly.tools bash -c "'sudo supervisorctl restart neighborly:\*'"
+     -arvz --delete ./ ec2-user@neighborly.tools:/var/www/neighborly.tools/qa-server/ &&
+    ssh -i aws_key -o StrictHostKeyChecking=no ec2-user@neighborly.tools bash -c "'sudo supervisorctl restart neighborly-qa:\*'"
