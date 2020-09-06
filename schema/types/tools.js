@@ -35,6 +35,30 @@ const toolsSchema = gql`
     category: ToolCategory = GENERAL
   }
 
+  input ToolLocation {
+    address1: String
+    address2: String
+    city: String
+    country: String
+    countryCode: String
+    latitude: Float
+    longitude: Float
+    provinceCode: String
+    zip: String
+  }
+
+  type Location {
+    address1: String
+    address2: String
+    city: String
+    country: String
+    countryCode: String
+    latitude: Float
+    longitude: Float
+    provinceCode: String
+    zip: String
+  }
+
   type Tool {
     _id: ID!
     title: String!
@@ -45,16 +69,21 @@ const toolsSchema = gql`
     weight: String
     description: String!
     electricalRatings: String
+    price: Float
+    unitOfMeasure: String
+    quantity: Int
     category: ToolCategory
+    location: Location
     url: String
     photo: File
     userId: ID
+    user: User
+    isRented: Boolean
     createdAt: Date!
     updatedAt: Date!
-    # comments: [Comment!]
   }
 
-  type Comment {
+  type Review {
     _id: ID!
     toolId: String
     content: String
@@ -63,15 +92,27 @@ const toolsSchema = gql`
     updatedAt: Date
   }
 
+  type Comment {
+    _id: ID!
+    targetId: String
+    author: [User]
+    content: String
+    createdAt: Date
+    updatedAt: Date
+  }
+
   extend type Query {
     getTools(cursor: String, limit: Int): ToolConnection!
-    tool(_id: ID!): Tool
+    getToolsByCategory(cursor: String, limit: Int, category: String): ToolConnection!
+    getToolById(toolId: ID!): Tool
     searchTools(search: String): [Tool!]!
     comment(_id: String): Comment
   }
 
   extend type Mutation {
-    addTool(input: ToolInput!, file: Upload!): Tool!
+    addTool(input: ToolInput!, location: ToolLocation!, file: Upload!): Tool!
+    rentTools(toolIds: [ID]!): ToolUpdateResponse!
+    cancelTool(toolId: ID!): ToolUpdateResponse!
     updateTool(_id: ID!, input: ToolInput!): Boolean!
     deleteTool(_id: ID!): Boolean!
     createComment(toolId: String, content: String): Comment
@@ -83,6 +124,12 @@ const toolsSchema = gql`
 
   type ToolAdded {
     tool: Tool!
+  }
+
+  type ToolUpdateResponse {
+    success: Boolean!
+    message: String
+    tools: [Tool]
   }
 `;
 

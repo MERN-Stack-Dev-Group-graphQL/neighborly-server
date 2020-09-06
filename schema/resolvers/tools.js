@@ -34,19 +34,78 @@ const toolsResolver = {
         },
       };
     },
-    tool: async (_, args, { toolLoader }, info) => {
+    getToolsByCategory: async (parent, { cursor, limit = 9, category }, context, info) => {
+      const cursorOptions = cursor
+        ? [
+            {
+              createdAt: {
+                $lt: fromCursorHash(cursor),
+              },
+            },
+          ]
+        : {};
+
+      const pipeline = [
+        {
+          $match: {
+            $and: [{ category: { $in: [category] } }],
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        { $limit: limit + 1 },
+      ];
+
+      const tools = await mongoDao.pool.db(database).collection('tools').aggregate(pipeline, cursorOptions).toArray();
+      const hasNextPage = tools.length > limit;
+      const edges = hasNextPage ? tools.slice(0, -1) : tools;
+      return {
+        edges,
+        pageInfo: {
+          hasNextPage,
+          endCursor: toCursorHash(edges[edges.length - 1].createdAt.toString()),
+        },
+      };
+    },
+    getToolById: async (_, { toolId }, { toolLoader }, info) => {
       console.log('ran tool');
-      const tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(args._id));
+      const tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(toolId));
 
       return tool;
     },
     searchTools: async (_, { search }) => {
+      const where = {};
+
+      if (search) {
+        where.search = search;
+      }
+
       var pipeline = [
         {
-          $search: {
-            search: {
-              query: search,
-              path: ['title', 'make', 'model', 'description', 'color', 'dimensions'],
+          $searchBeta: {
+            compound: {
+              should: [
+                {
+                  text: {
+                    query: where.search,
+                    path: 'title',
+                    fuzzy: {
+                      maxEdits: 2,
+                      prefixLength: 1,
+                    },
+                    score: {
+                      boost: {
+                        value: 5,
+                      },
+                    },
+                  },
+                },
+                {
+                  text: {
+                    query: where.search,
+                    path: ['title', 'make', 'model', 'description', 'color', 'dimensions'],
+                  },
+                },
+              ],
             },
             highlight: {
               path: ['title', 'make', 'model', 'description', 'color', 'dimensions'],
@@ -55,13 +114,23 @@ const toolsResolver = {
         },
         {
           $project: {
+            _id: 1,
             title: 1,
             make: 1,
             model: 1,
             color: 1,
             dimensions: 1,
+            weight: 1,
             description: 1,
-            _id: 0,
+            location: 1,
+            category: 1,
+            price: 1,
+            unitOfMeasure: 1,
+            quantity: 1,
+            userId: 1,
+            url: 1,
+            photo: 1,
+            createdAt: 1,
             score: {
               $meta: 'searchScore',
             },
@@ -71,7 +140,7 @@ const toolsResolver = {
           },
         },
         {
-          $limit: 5,
+          $limit: 10,
         },
       ];
 
@@ -80,7 +149,7 @@ const toolsResolver = {
     },
   },
   Mutation: {
-    addTool: async (_, { input, file }, { me }, info) => {
+    addTool: async (_, { input, location, file }, { me }, info) => {
       const dbTools = await mongoDao.pool.db(database).collection('tools');
       // If there is not a user in the context, throw an error
       console.log(me);
@@ -104,6 +173,9 @@ const toolsResolver = {
 
         const newTool = {
           ...input,
+          location: {
+            ...location,
+          },
           photo: upload,
           userId: ObjectID(me._id),
           createdAt: new Date(),
@@ -160,6 +232,10 @@ const toolsResolver = {
   },
   Tool: {
     url: (parent) => `/${parent.photo.path || parent.photo.path.toString()}`,
+    user: async (parent, _, { userLoader }) => {
+      const user = await userLoader.load(parent.userId);
+      return user;
+    },
   },
 };
 
