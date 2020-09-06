@@ -10,7 +10,6 @@ const { ObjectID } = require('mongodb');
 let pool;
 
 const init = async (secret) => {
-  console.log('ran init and return pool');
   if (pool) return pool;
   const uri = process.env.MONGODB_URI;
 
@@ -25,7 +24,6 @@ const init = async (secret) => {
     pool && pool.close(true);
   });
 
-  console.log('🚀 Connected to MongoDB Successfully');
   return pool;
 };
 
@@ -57,7 +55,6 @@ const getOneDoc = (database, collection, field, args) => {
     .collection(collection)
     .findOne({ [field]: args })
     .then((data) => {
-      console.log(data, 'test data return');
       return data;
     });
 };

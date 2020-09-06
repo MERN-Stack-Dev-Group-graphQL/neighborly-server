@@ -30,14 +30,12 @@ const database = process.env.MONGODB_DB;
 const usersResolver = {
   Query: {
     allUsers: async (_, args, { loaders }, info) => {
-      console.log('ran users');
       const users = await mongoDao.pool
         .db(database)
         .collection('users')
         .find()
         .toArray()
         .then((data) => {
-          console.log(data, 'users test data returned');
           return data;
         });
 
@@ -50,20 +48,17 @@ const usersResolver = {
         .collection('users')
         .findOne({ _id: ObjectID(args._id) })
         .then((data) => {
-          console.log(data, 'user test data returned');
           return data;
         });
       return user;
     },
-    me: async (parent, args, { me }) => {
-      console.log('ran me');
+    me: async (_, __, { me }) => {
+      console.log('ran me: ', me);
       if (!me) {
         return null;
       }
-      return await mongoDao.pool
-        .db(database)
-        .collection('users')
-        .findOne({ _id: ObjectID(me._id) });
+
+      return await mongoDao.getOneDoc(database, 'users', '_id', ObjectID(me._id));
     },
   },
   Mutation: {
@@ -145,9 +140,33 @@ const usersResolver = {
         token,
       };
     },
-    updateUser: combineResolvers(isAuthenticated, async (parent, { email }, { me }) => {
-      return await mongoDao.pool.db(database).collection('users').findByIdAndUpdate(me._id, { email }, { new: true });
-    }),
+    updateUser: async (_, { input }, { me }, info) => {
+      try {
+        const userData = {
+          _id: me._id,
+          input: {
+            ...input,
+            updatedAt: new Date(),
+          },
+        };
+
+        console.log('USER: ', userData);
+
+        const result = await mongoDao.updateOneDoc(database, 'users', '_id', userData);
+
+        if (result.matchedCount === 0) {
+          console.error(`Update failed! ${result.matchedCount} document(s) matched the query criteria`);
+          console.log(`${result.modifiedCount} document(s) was/were updated`);
+          return false;
+        } else {
+          console.log(`${result.matchedCount} document(s) matched the query criteria`);
+          console.log(`${result.modifiedCount} document(s) was/were updated`);
+          return true;
+        }
+      } catch (error) {
+        throw error;
+      }
+    },
     deleteUser: combineResolvers(isAdmin, async (parent, { _id }, context) => {
       const user = await mongoDao.pool
         .db(database)
@@ -160,15 +179,34 @@ const usersResolver = {
         return false;
       }
     }),
+    resetUserPassword: async () => {
+      // ADD RESET LOGIC HERE
+    },
   },
   User: {
-    messages: async (user, args, context) => {
-      return await mongoDao.pool.db(database).collection('messsges').find({
-        userId: user._id,
-      });
-    },
-    neighbors: async (user, args, { userLoader }) => {
-      return userLoader.loadMany(user.neighbors);
+    tools: async (_, __, { me }) => {
+      console.log(me);
+      const userId = me._id;
+      const found = await mongoDao.pool
+        .db(database)
+        .collection('tools')
+        .find({ userId: ObjectID(userId) })
+        .toArray()
+        .then((data) => {
+          return data;
+        });
+
+      const toolIds = found && found.length ? found.map((t) => t._id).filter((t) => !!t) : [];
+
+      if (!toolIds.length) return [];
+      return (
+        Promise.all(
+          toolIds.map(async (toolId) => {
+            const response = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(toolId));
+            return response;
+          })
+        ) || []
+      );
     },
   },
 };

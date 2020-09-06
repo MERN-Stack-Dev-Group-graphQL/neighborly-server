@@ -20,7 +20,7 @@ const run = async () => {
   await initConnections();
 
   const server = CreateApolloServer();
-  server.applyMiddleware({ app, path: '/api/graphql' });
+  server.applyMiddleware({ app, path: '/graphql' });
 
   app.use('/', express.static(path.join(__dirname)));
 

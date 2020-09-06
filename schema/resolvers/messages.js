@@ -8,15 +8,12 @@ const { ObjectID } = require('mongodb');
 const database = process.env.MONGODB_DB;
 
 const toCursorHash = (string) => Buffer.from(string).toString('base64');
-const fromCursorHash = (string) => {
-  console.log(string, 'test string');
-  return Buffer.from(string, 'base64').toString('ascii');
-};
+const fromCursorHash = (string) => Buffer.from(string, 'base64').toString('ascii');
 
 export default {
   Query: {
     messages: async (parent, { cursor, limit = 100 }, context) => {
-      console.log(cursor, 'test cursor');
+      // console.log(cursor, 'test cursor');
       const cursorOptions = cursor
         ? {
             createdAt: {
@@ -24,8 +21,7 @@ export default {
             },
           }
         : {};
-      // console.log(fromCursorHash(cursor), 'test cursor');
-      // console.log(cursorOptions, 'test option');
+
       const messages = await mongoDao.getAllDocs(database, 'messages', cursorOptions, limit);
 
       const hasNextPage = messages.length > limit;

@@ -8,7 +8,6 @@ const { validateToolInput } = require('../../util/validators');
 const database = process.env.MONGODB_DB;
 
 const toCursorHash = (string) => Buffer.from(string).toString('base64');
-
 const fromCursorHash = (string) => {
   console.log(string, 'test string');
   return Buffer.from(string, 'base64').toString('ascii');
@@ -16,16 +15,20 @@ const fromCursorHash = (string) => {
 
 const toolsResolver = {
   Query: {
-    getTools: async (_, { cursor, limit = 9 }, context, info) => {
-      // console.log('ran tools');
+    getTools: async (parent, { cursor, limit = 9 }, context, info) => {
       // console.log(cursor, 'test cursor');
-      const cursorOptions = cursor ? { createdAt: { $lt: fromCursorHash(cursor) } } : {};
+      const cursorOptions = cursor
+        ? {
+            createdAt: {
+              $lt: fromCursorHash(cursor),
+            },
+          }
+        : {};
+
       // console.log(cursorOptions, 'test option');
-
-      const allTools = await mongoDao.getAllDocs(database, 'tools', cursorOptions, limit);
-
-      const hasNextPage = allTools.length > limit;
-      const edges = hasNextPage ? allTools.slice(0, -1) : allTools;
+      const tools = await mongoDao.getAllDocs(database, 'tools', cursorOptions, limit);
+      const hasNextPage = tools.length > limit;
+      const edges = hasNextPage ? tools.slice(0, -1) : tools;
       return {
         edges,
         pageInfo: {
@@ -66,8 +69,7 @@ const toolsResolver = {
         },
       };
     },
-    getToolById: async (_, { toolId }, { toolLoader }, info) => {
-      console.log('ran tool');
+    getToolById: async (_, { toolId }, { toolLoader }) => {
       const tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(toolId));
 
       return tool;
@@ -201,7 +203,7 @@ const toolsResolver = {
       const result = await mongoDao.updateOneDoc(database, 'tools', '_id', args);
 
       if (result.matchedCount === 0) {
-        console.error(`Delete failed! ${result.matchedCount} document(s) matched the query criteria`);
+        console.error(`Update failed! ${result.matchedCount} document(s) matched the query criteria`);
         console.log(`${result.modifiedCount} document(s) was/were updated`);
         return false;
       } else {

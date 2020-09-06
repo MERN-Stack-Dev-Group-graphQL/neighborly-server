@@ -7,8 +7,8 @@ const messagesSchema = gql`
   }
 
   type PageInfo {
-    hasNextPage: Boolean!
     endCursor: String!
+    hasNextPage: Boolean!
   }
 
   input MessageInput {
