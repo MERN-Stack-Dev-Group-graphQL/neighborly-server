@@ -6,9 +6,7 @@ import { mkdir } from 'fs';
 const { ObjectID } = require('mongodb');
 const { validateToolInput } = require('../../util/validators');
 const database = process.env.MONGODB_DB;
-
 const toCursorHash = (string) => Buffer.from(string).toString('base64');
-
 const fromCursorHash = (string) => {
   console.log(string, 'test string');
   return Buffer.from(string, 'base64').toString('ascii');
@@ -17,13 +15,8 @@ const fromCursorHash = (string) => {
 const toolsResolver = {
   Query: {
     getTools: async (_, { cursor, limit = 9 }, context, info) => {
-      // console.log('ran tools');
-      // console.log(cursor, 'test cursor');
       const cursorOptions = cursor ? { createdAt: { $lt: fromCursorHash(cursor) } } : {};
-      // console.log(cursorOptions, 'test option');
-
       const allTools = await mongoDao.getAllDocs(database, 'tools', cursorOptions, limit);
-
       const hasNextPage = allTools.length > limit;
       const edges = hasNextPage ? allTools.slice(0, -1) : allTools;
       return {
@@ -34,9 +27,40 @@ const toolsResolver = {
         },
       };
     },
-    tool: async (_, args, { toolLoader }, info) => {
-      console.log('ran tool');
-      const tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(args._id));
+    getToolsByCategory: async (parent, { cursor, limit = 9, category }, context, info) => {
+      const cursorOptions = cursor
+        ? [
+            {
+              createdAt: {
+                $lt: fromCursorHash(cursor),
+              },
+            },
+          ]
+        : {};
+
+      const pipeline = [
+        {
+          $match: {
+            $and: [{ category: { $in: [category] } }],
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        { $limit: limit + 1 },
+      ];
+
+      const tools = await mongoDao.pool.db(database).collection('tools').aggregate(pipeline, cursorOptions).toArray();
+      const hasNextPage = tools.length > limit;
+      const edges = hasNextPage ? tools.slice(0, -1) : tools;
+      return {
+        edges,
+        pageInfo: {
+          hasNextPage,
+          endCursor: toCursorHash(edges[edges.length - 1].createdAt.toString()),
+        },
+      };
+    },
+    getToolById: async (_, { toolId }, { toolLoader }) => {
+      const tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(toolId));
 
       return tool;
     },
@@ -80,7 +104,7 @@ const toolsResolver = {
     },
   },
   Mutation: {
-    addTool: async (_, { input, file }, { me }, info) => {
+    addTool: async (_, { input, location, file }, { me }, info) => {
       const dbTools = await mongoDao.pool.db(database).collection('tools');
       // If there is not a user in the context, throw an error
       console.log(me);
@@ -104,6 +128,9 @@ const toolsResolver = {
 
         const newTool = {
           ...input,
+          location: {
+            ...location,
+          },
           photo: upload,
           userId: ObjectID(me._id),
           createdAt: new Date(),
