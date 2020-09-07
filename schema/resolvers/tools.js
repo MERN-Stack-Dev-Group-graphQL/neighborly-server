@@ -187,6 +187,10 @@ const toolsResolver = {
   },
   Tool: {
     url: (parent) => `/${parent.photo.path || parent.photo.path.toString()}`,
+    user: async (parent, _, { userLoader }) => {
+      const user = await userLoader.load(parent.userId);
+      return user;
+    },
   },
 };
 
