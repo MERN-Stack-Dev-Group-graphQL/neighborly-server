@@ -30,40 +30,32 @@ const database = process.env.MONGODB_DB;
 const usersResolver = {
   Query: {
     allUsers: async (_, args, { loaders }, info) => {
-      console.log('ran users');
       const users = await mongoDao.pool
         .db(database)
         .collection('users')
         .find()
         .toArray()
         .then((data) => {
-          console.log(data, 'users test data returned');
           return data;
         });
 
       return users;
     },
     user: async (_, args, { loaders }, info) => {
-      console.log('ran user');
       const user = await mongoDao.pool
         .db(database)
         .collection('users')
         .findOne({ _id: ObjectID(args._id) })
         .then((data) => {
-          console.log(data, 'user test data returned');
           return data;
         });
       return user;
     },
-    me: async (parent, args, { me }) => {
-      console.log('ran me');
+    me: async (_, __, { me }) => {
       if (!me) {
         return null;
       }
-      return await mongoDao.pool
-        .db(database)
-        .collection('users')
-        .findOne({ _id: ObjectID(me._id) });
+      return await mongoDao.getOneDoc(database, 'users', '_id', ObjectID(me._id));
     },
   },
   Mutation: {
@@ -109,7 +101,7 @@ const usersResolver = {
             console.error(`Failed to insert new user: ${err}`);
             return { error: e };
           });
-        console.log(user);
+
         const token = createToken(user);
         return { ...user, _id: user._id, token };
       } catch (error) {

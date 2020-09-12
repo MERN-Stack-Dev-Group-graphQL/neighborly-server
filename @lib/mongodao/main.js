@@ -57,7 +57,6 @@ const getOneDoc = (database, collection, field, args) => {
     .collection(collection)
     .findOne({ [field]: args })
     .then((data) => {
-      console.log(data, 'test data return');
       return data;
     });
 };

@@ -8,12 +8,13 @@ const usersSchema = gql`
     firstName: String!
     lastName: String!
     email: String!
+    bio: String
     phone: String
     mobile: String
     locationId: Int
     locationDetails: String
     role: UserRole
-    tools: [Tool!]!
+    tools: [Tool]!
     neighbors: [Neighborhood!]!
     messages: [Message!]!
     postedTools: [Tool!]!
@@ -38,9 +39,10 @@ const usersSchema = gql`
     firstName: String!
     lastName: String!
     email: String!
+    bio: String
     role: UserRole = ADMIN
-    password: String!
-    confirmPassword: String!
+    password: String
+    confirmPassword: String
     createdAt: Date
     updatedAt: Date
   }
@@ -61,8 +63,9 @@ const usersSchema = gql`
   extend type Mutation {
     register(input: UserInput!): User!
     login(login: String!, password: String!): Token!
-    updateUser(login: String!): User!
+    updateUser(_id: ID!, input: UserInput!): Boolean!
     deleteUser(_id: ID!): Boolean!
+    resetUserPassword(email: String!): Token!
   }
 `;
 
