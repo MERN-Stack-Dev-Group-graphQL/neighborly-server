@@ -1,7 +1,8 @@
-import { UserInputError } from 'apollo-server';
+import { UserInputError, ApolloError } from 'apollo-server';
 import pubsub, { EVENTS } from '../../subscription';
 import mongoDao from '../../@lib/mongodao';
 import { mkdir } from 'fs';
+import { searchPipeline, categoryPipeline } from '../../util/tools/pipeline';
 
 const { ObjectID } = require('mongodb');
 const { validateToolInput } = require('../../util/validators');
@@ -13,8 +14,21 @@ const fromCursorHash = (string) => {
 };
 
 const toolsResolver = {
+  ToolResult: {
+    __resolveType(obj, context, info) {
+      if (obj.title) {
+        return 'Tool';
+      }
+
+      if (obj.message) {
+        return 'ToolNotFound';
+      }
+
+      return null;
+    },
+  },
   Query: {
-    getTools: async (_, { cursor, limit = 9 }, context, info) => {
+    getTools: async (_, { cursor, limit = 9 }) => {
       const cursorOptions = cursor ? { createdAt: { $lt: fromCursorHash(cursor) } } : {};
       const allTools = await mongoDao.getAllDocs(database, 'tools', cursorOptions, limit);
       const hasNextPage = allTools.length > limit;
@@ -27,7 +41,7 @@ const toolsResolver = {
         },
       };
     },
-    getToolsByCategory: async (parent, { cursor, limit = 9, category }, context, info) => {
+    getToolsByCategory: async (_, { cursor, limit = 9, category }) => {
       const cursorOptions = cursor
         ? [
             {
@@ -38,76 +52,57 @@ const toolsResolver = {
           ]
         : {};
 
-      const pipeline = [
-        {
-          $match: {
-            $and: [{ category: { $in: [category] } }],
+      let pipeline, tools;
+      try {
+        pipeline = categoryPipeline(category, limit);
+        tools = await mongoDao.pool.db(database).collection('tools').aggregate(pipeline, cursorOptions).toArray();
+
+        const hasNextPage = tools.length > limit;
+        const edges = hasNextPage ? tools.slice(0, -1) : tools;
+        return {
+          edges,
+          pageInfo: {
+            hasNextPage,
+            endCursor: toCursorHash(edges[edges.length - 1].createdAt.toString()),
           },
-        },
-        { $sort: { createdAt: -1 } },
-        { $limit: limit + 1 },
-      ];
-
-      const tools = await mongoDao.pool.db(database).collection('tools').aggregate(pipeline, cursorOptions).toArray();
-      const hasNextPage = tools.length > limit;
-      const edges = hasNextPage ? tools.slice(0, -1) : tools;
-      return {
-        edges,
-        pageInfo: {
-          hasNextPage,
-          endCursor: toCursorHash(edges[edges.length - 1].createdAt.toString()),
-        },
-      };
+        };
+      } catch (error) {
+        throw new ApolloError(`Unable to get tools by category, reason: ${error.message}`);
+      }
     },
-    getToolById: async (_, { toolId }, { toolLoader }) => {
-      const tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(toolId));
-
+    getToolById: async (_, { toolId }) => {
+      let tool;
+      try {
+        tool = await mongoDao.getOneDoc(database, 'tools', '_id', ObjectID(toolId));
+      } catch (error) {
+        tool = {};
+        throw new ApolloError(`The tool with the id ${toolId} cannot be located, reason: ${error.message}`);
+      }
       return tool;
     },
     searchTools: async (_, { search }) => {
-      var pipeline = [
-        {
-          $search: {
-            search: {
-              query: search,
-              path: ['title', 'make', 'model', 'description', 'color', 'dimensions'],
-            },
-            highlight: {
-              path: ['title', 'make', 'model', 'description', 'color', 'dimensions'],
-            },
-          },
-        },
-        {
-          $project: {
-            title: 1,
-            make: 1,
-            model: 1,
-            color: 1,
-            dimensions: 1,
-            description: 1,
-            _id: 0,
-            score: {
-              $meta: 'searchScore',
-            },
-            highlight: {
-              $meta: 'searchHighlights',
-            },
-          },
-        },
-        {
-          $limit: 5,
-        },
-      ];
+      const where = {};
 
-      const tools = await mongoDao.pool.db(database).collection('tools').aggregate(pipeline).toArray();
+      if (search) {
+        where.search = search;
+      }
+
+      let pipeline, tools;
+
+      try {
+        pipeline = searchPipeline(where);
+        tools = await mongoDao.pool.db(database).collection('tools').aggregate(pipeline).toArray();
+      } catch (error) {
+        tools = {};
+        throw new ApolloError(`Unable to search tools, reason: ${error.message}`);
+      }
       return tools;
     },
   },
   Mutation: {
-    addTool: async (_, { input, location, file }, { me }, info) => {
+    addTool: async (_, { input, location, file }, { me }) => {
       const dbTools = await mongoDao.pool.db(database).collection('tools');
-      // If there is not a user in the context, throw an error
-      console.log(me);
+
       if (!me) {
         throw new Error('only an authorized user can post a tool');
       }
@@ -123,7 +118,6 @@ const toolsResolver = {
           if (err) throw err;
         });
 
-        // Process upload
         const upload = await mongoDao.processUpload(file);
 
         const newTool = {
@@ -140,9 +134,6 @@ const toolsResolver = {
         const { insertedId } = await dbTools.insertOne(newTool);
         newTool._id = insertedId;
 
-        console.log(newTool);
-        console.info(newTool);
-
         pubsub.publish(EVENTS.TOOL.ADDED, {
           toolAdded: { newTool },
         });
@@ -152,7 +143,7 @@ const toolsResolver = {
         throw error;
       }
     },
-    updateTool: async (parent, args, context, info) => {
+    updateTool: async (_, args) => {
       const result = await mongoDao.updateOneDoc(database, 'tools', '_id', args);
 
       if (result.matchedCount === 0) {
@@ -165,7 +156,7 @@ const toolsResolver = {
         return true;
       }
     },
-    deleteTool: async (parent, args, context, info) => {
+    deleteTool: async (_, args) => {
       const { deletedCount } = await mongoDao.pool
         .db(database)
         .collection('tools')

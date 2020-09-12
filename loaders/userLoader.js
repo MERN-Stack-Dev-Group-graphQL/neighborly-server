@@ -4,6 +4,7 @@ import mongoDao from '../@lib/mongodao';
 const database = process.env.MONGODB_DB;
 const collection = 'users';
 const field = '_id';
+
 const batchUsers = async (keys) => {
   const users = await mongoDao.pool
     .db(database)

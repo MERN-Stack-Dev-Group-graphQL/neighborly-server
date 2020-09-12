@@ -1,6 +1,8 @@
-import { gql } from 'apollo-server';
+const { gql } = require('apollo-server');
 
 const toolsSchema = gql`
+  union ToolResult = Tool | ToolNotFound
+
   type File {
     _id: ID!
     filename: String!
@@ -9,7 +11,7 @@ const toolsSchema = gql`
   }
 
   type ToolConnection {
-    edges: [Tool!]!
+    edges: [ToolResult!]!
     pageInfo: PageInfo!
   }
 
@@ -92,11 +94,15 @@ const toolsSchema = gql`
     updatedAt: Date
   }
 
+  type ToolNotFound {
+    message: String
+  }
+
   extend type Query {
     getTools(cursor: String, limit: Int): ToolConnection!
     getToolsByCategory(cursor: String, limit: Int, category: String): ToolConnection!
-    getToolById(toolId: ID!): Tool
-    searchTools(search: String): [Tool!]!
+    getToolById(toolId: ID!): ToolResult
+    searchTools(search: String): [ToolResult!]!
     comment(_id: String): Comment
   }
 
