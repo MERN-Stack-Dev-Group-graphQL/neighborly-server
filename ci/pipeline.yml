@@ -32,6 +32,7 @@ jobs:
 - name: terraform-infrastructure
   plan:
   - get: git
+    trigger: true
   - put: terraform
     params:
       terraform_source: git/ci/terraform/
