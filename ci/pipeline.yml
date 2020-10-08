@@ -22,8 +22,6 @@ resources:
         bucket: neighborly-bucket
         key: terraform.tfstate
         region: eu-west-1
-        access_key: ((concourse_ci_s3_access_key))
-        secret_key: ((concourse_ci_s3_secret_key))
       env:
         AWS_ACCESS_KEY_ID: ((environment_access_key))
         AWS_SECRET_ACCESS_KEY: ((environment_secret_key))
