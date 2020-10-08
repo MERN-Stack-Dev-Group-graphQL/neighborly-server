@@ -13,7 +13,7 @@ resources:
       branch: terraform
       private_key: ((private_key))
 
-  - name: terraform
+  - name: terraform-resource
     type: terraform
     source:
       backend_type: s3
@@ -33,7 +33,7 @@ jobs:
   plan:
   - get: git
     trigger: true
-  - put: terraform
+  - put: terraform-resource
     params:
       terraform_source: git/ci/terraform/
 
