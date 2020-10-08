@@ -34,6 +34,29 @@ jobs:
   - put: terraform-resource
     params:
       terraform_source: git/ci/terraform/
+  - task: deploy
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: eeacms/rsync
+      inputs:
+      - name: terraform-resource
+      run:
+        path: /bin/sh
+        args:
+          - -c
+          - |
+            apk update && apk add jq
+            export aws_key=$(cat terraform-resource/metadata | jq .private_key)
+            export public_ip=$(cat terraform-resource/metadata | jq .public_ip)
+            touch foo
+
+            rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $aws_key" \
+              -arvz --delete ./foo ec2-user@$public_ip
+            # ssh -i $aws_key -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
+
 
 - name: deploy-to-server
   serial: true
