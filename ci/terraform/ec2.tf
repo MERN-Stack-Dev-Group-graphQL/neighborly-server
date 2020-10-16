@@ -23,7 +23,7 @@ resource "aws_key_pair" "generated-key" {
 }
 
 resource "aws_instance" "neighborly-server" {
-  ami           = "ami-0bb3fad3c0286ebd5"
+  ami           = "ami-0947d2ba12ee1ff75"
   instance_type = "t2.micro"
   key_name = aws_key_pair.generated-key.key_name
   tags = {
