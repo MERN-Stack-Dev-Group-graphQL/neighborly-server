@@ -21,10 +21,10 @@ resources:
       backend_config:
         bucket: neighborly-bucket
         key: terraform.tfstate
-        region: eu-west-1
+        region: us-east-1
       env:
-        AWS_ACCESS_KEY_ID: ((environment_access_key))
-        AWS_SECRET_ACCESS_KEY: ((environment_secret_key))
+        AWS_ACCESS_KEY_ID: ((AWS_ACCESS_KEY_ID))
+        AWS_SECRET_ACCESS_KEY: ((AWS_SECRET_ACCESS_KEY))
 
 jobs:
 - name: terraform-infrastructure
