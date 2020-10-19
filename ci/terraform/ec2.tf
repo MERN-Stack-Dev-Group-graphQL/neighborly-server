@@ -9,7 +9,7 @@ terraform {
 
 provider "aws" {
   profile = "saml"
-  region = "eu-east-1"
+  region = "us-east-1"
 }
 
 resource "aws_instance" "neighborly-server" {
