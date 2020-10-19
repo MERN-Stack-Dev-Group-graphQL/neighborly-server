@@ -19,7 +19,7 @@ resources:
       backend_type: s3
       env_name: dev
       backend_config:
-        bucket: neighborly-bucket
+        bucket: neighborly-terraform
         key: terraform.tfstate
         region: us-east-1
       env:
