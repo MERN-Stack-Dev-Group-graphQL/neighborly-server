@@ -15,7 +15,7 @@ provider "aws" {
 resource "aws_instance" "neighborly-server" {
   ami           = "ami-0947d2ba12ee1ff75"
   instance_type = "t2.micro"
-  key_name = "jess-key-pair-test"
+  key_name = "neighborly-server-test"
   tags = {
     Name = "neighborly-server"
   }
