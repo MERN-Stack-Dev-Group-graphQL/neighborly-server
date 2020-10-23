@@ -34,29 +34,54 @@ jobs:
   - put: terraform-resource
     params:
       terraform_source: git/ci/terraform/
+  - task: build
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: node
+          tag: alpine
+      inputs:
+        - name: git
+      outputs:
+        - name: server
+          path: git
+      params:
+        NEIGHBORLY_ENV: ((neighborly_env))
+      run:
+        path: /bin/sh
+        args:
+          - -c
+          - |
+            cd git &&
+            npm i &&
+            echo "$NEIGHBORLY_ENV" >> .env
   - task: deploy
     config:
       platform: linux
       image_resource:
         type: docker-image
         source:
-          repository: eeacms/rsync
+          repository: ubuntu
       inputs:
-      - name: terraform-resource
+        - name: server
+          path: .
+        - name: terraform-resource
+      params:
+        SERVER_KEY: ((server_private_key))
       run:
         path: /bin/sh
         args:
           - -c
           - |
-            apk update && apk add jq
-            export aws_key=$(cat terraform-resource/metadata | jq .private_key)
-            export public_ip=$(cat terraform-resource/metadata | jq .public_ip)
-            touch foo
-
-            rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $aws_key" \
-              -arvz --delete ./foo ec2-user@$public_ip
-            # ssh -i $aws_key -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
-
+            apt-get update && apt-get -y install rsync jq openssh-client
+            export public_ip=$(cat terraform-resource/metadata | jq -r .public_ip)
+            echo "$SERVER_KEY" > key_file
+            chmod 400 key_file
+            rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
+              -arvz --delete ./ ec2-user@$public_ip
+            ssh -i ./key_file -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
 
 - name: deploy-to-server
   serial: true
