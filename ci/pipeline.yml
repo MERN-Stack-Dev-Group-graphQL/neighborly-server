@@ -27,6 +27,13 @@ resources:
       env:
         AWS_ACCESS_KEY_ID: ((AWS_ACCESS_KEY_ID))
         AWS_SECRET_ACCESS_KEY: ((AWS_SECRET_ACCESS_KEY))
+  - name: s3
+    type: s3
+    source:
+      bucket: neighborly-server-build
+      versioned_file: neighborly-server.tar.gz
+      access_key_id: ((AWS_ACCESS_KEY_ID))
+      secret_access_key: ((AWS_SECRET_ACCESS_KEY))
 
 jobs:
   - name: terraform-infrastructure
@@ -56,11 +63,18 @@ jobs:
           run:
             path: /bin/sh
             args:
-              - -c
+              - -xc
               - |
                 cd git &&                
                 npm i &&
                 echo "$NEIGHBORLY_ENV" >> .env
+                pwd
+                ls -a
+                tar -zcvf neighborly-server.tar.gz -C ../git .                                
+      - put: s3
+        params:
+          file: server/neighborly-server.tar.gz
+             
       - task: deploy
         config:
           platform: linux
@@ -69,7 +83,7 @@ jobs:
             source:
               repository: ubuntu
           inputs:
-            - name: server
+            - name: s3
               path: .
             - name: terraform-resource
           params:
@@ -79,18 +93,23 @@ jobs:
             args:
               - -c
               - |
-                apt-get update && apt-get -y install aws-cli rsync jq openssh-client
+                apt-get update && apt-get -y install rsync jq openssh-client
+                DEBIAN_FRONTEND=noninteractive apt-get -y install awscli
                 export public_ip=$(cat terraform-resource/metadata | jq -r .public_ip)
                 echo "$SERVER_KEY" > key_file
-                chmod 600 key_file
-                aws ec2-instance-connect send-ssh-public-key \
-                  --region $AWS_REGION \
-                  --instance-id $AWS_INSTANCE_ID \
-                  --availability-zone $AWS_AVAILABILITY_ZONE \
-                  --instance-os-user $AWS_INSTANCE_OS_USER \
-                  --ssh-public-key ./key-file &&
-                rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
-                  -arvz --delete ./ ec2-user@$public_ip
+                chmod 600 key_file                                               
+                rsync --progress -rave "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file.pem" \
+                ./neighborly-server.tar.gz ec2-user@$public_ip:/home/ec2-user/neighborly-server.tar.gz
+                ssh -i key_file.pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip mkdir -p /var/www/neighborly.tools | tar xzf /home/ec2-user/neighborly-server.tar.gz -C /var/www/neighborly.tools/
+                ls /var/www/neighborly.tools
+                # aws ec2-instance-connect send-ssh-public-key \
+                #   --region $AWS_REGION \
+                #   --instance-id $AWS_INSTANCE_ID \
+                #   --availability-zone $AWS_AVAILABILITY_ZONE \
+                #   --instance-os-user $AWS_INSTANCE_OS_USER \
+                #   --ssh-public-key ./key-file &&
+                # rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
+                #   -arvz --delete ./ ec2-user@$public_ip
                 # ssh -i ./key_file -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
 
   - name: deploy-to-server

@@ -12,11 +12,11 @@ provider "aws" {
   region = "us-east-1"
 }
 
-resource "aws_instance" "neighborly-server-dev" {
+resource "aws_instance" "neighborly_server_dev" {
   ami           = "ami-0947d2ba12ee1ff75"
   instance_type = "t2.micro"
   key_name = "neighborly-server-test"
   tags = {
-    Name = "neighborly-server-dev"
+    Name = "neighborly_server_dev"
   }
 }
