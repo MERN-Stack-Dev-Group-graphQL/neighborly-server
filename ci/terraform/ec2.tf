@@ -14,16 +14,14 @@ provider "aws" {
 
 resource "aws_security_group" "allow_all" {
   name = "allow all"
-  description = "allow all"
-  vpc_id = "vpc-acc2d0c9"
+  description = "allow all"  
   id = "sg-0badf30d69e4dca5d"
-  
 }
 
 resource "aws_instance" "neighborly_server_dev" {
   ami           = "ami-0947d2ba12ee1ff75"
   instance_type = "t2.micro"
-  vpc_security_group_ids = ["${aws_security_group.allow_all.vpc_id}"]
+  aws_security_group = ["${aws_security_group.allow_all.id}"]
   key_name = "neighborly-server-test"
   tags = {
     Name = "neighborly_server_dev"
