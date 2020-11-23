@@ -17,8 +17,8 @@ sudo yum install supervisor
 sudo groupadd --system supervisor
 sudo su 
 echo_supervisord_conf > /etc/supervisord.conf
+sudo cp neighborly.ini /etc/supervisord.d/neighborly.ini
 sudo systemctl enable supervisord
 sudo systemctl start supervisord.service
-
 sudo supervisorctl reload
 sudo systemctl restart nginx
