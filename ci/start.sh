@@ -8,4 +8,4 @@ wget -O epel.rpm –nv https://dl.fedoraproject.org/pub/epel/epel-release-latest
 DEBIAN_FRONTEND=noninteractive sudo yum install -y ./epel.rpm
 DEBIAN_FRONTEND=noninteractive sudo yum install python2-certbot.noarch -y
 DEBIAN_FRONTEND=noninteractive sudo yum install python-certbot-nginx -y
-DEBIAN_FRONTEND=noninteractive sudo certbot -n --nginx --email 2015rpro@gmail.com --agree-tos
+DEBIAN_FRONTEND=noninteractive sudo certbot -n --nginx --email 2015rpro@gmail.com --agree-tos --domain neighborly.tools
