@@ -100,8 +100,8 @@ jobs:
                 chmod 400 key_file                                               
                 rsync --progress -rave "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
                 ./neighborly-server.tar.gz ec2-user@$public_ip:/home/ec2-user/neighborly-server.tar.gz
-                ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip sudo mkdir /var/www/neighborly.tools/
-                ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip tar xzf /home/ec2-user/neighborly-server.tar.gz -C /var/www/neighborly.tools/
+                ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip sudo mkdir /var/www/neighborly.tools
+                ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip sudo tar xzf /home/ec2-user/neighborly-server.tar.gz -C /var/www/neighborly.tools/
                 ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip /var/www/neighborly.tools/ci/start.sh
                 
                 # aws ec2-instance-connect send-ssh-public-key \
