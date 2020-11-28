@@ -30,7 +30,7 @@ resources:
     type: terraform
     source:
       backend_type: s3
-      env_name: dev
+      env_name: staging
       backend_config:
         bucket: neighborly-terraform-staging
         key: terraform.tfstate
@@ -132,6 +132,7 @@ jobs:
                 # ssh -i ./key_file -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
   - name: neighborly-server-staging
     plan:
+      - get: git
       - get: s3
         passed: [neighborly-server-dev]
       - put: terraform-resource-staging
