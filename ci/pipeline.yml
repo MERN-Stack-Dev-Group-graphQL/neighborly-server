@@ -14,7 +14,6 @@ resources:
       uri: git@github.com:MERN-Stack-Dev-Group-graphQL/neighborly-server.git
       branch: terraform
       private_key: ((private_key))
-
   - name: terraform-resource
     type: terraform
     source:
@@ -27,6 +26,18 @@ resources:
       env:
         AWS_ACCESS_KEY_ID: ((AWS_ACCESS_KEY_ID))
         AWS_SECRET_ACCESS_KEY: ((AWS_SECRET_ACCESS_KEY))
+  - name: terraform-resource-staging
+    type: terraform
+    source:
+      backend_type: s3
+      env_name: dev
+      backend_config:
+        bucket: neighborly-terraform-staging
+        key: terraform.tfstate
+        region: us-east-1
+      env:
+        AWS_ACCESS_KEY_ID: ((AWS_ACCESS_KEY_ID))
+        AWS_SECRET_ACCESS_KEY: ((AWS_SECRET_ACCESS_KEY))
   - name: s3
     type: s3
     source:
@@ -34,9 +45,15 @@ resources:
       versioned_file: neighborly-server.tar.gz
       access_key_id: ((AWS_ACCESS_KEY_ID))
       secret_access_key: ((AWS_SECRET_ACCESS_KEY))
-
+  - name: staging-build
+    type: s3
+    source:
+      bucket: neighborly-tools-staging-build
+      versioned_file: neighborly-server-staging.tar.gz
+      access_key_id: ((AWS_ACCESS_KEY_ID))
+      secret_access_key: ((AWS_SECRET_ACCESS_KEY))
 jobs:
-  - name: terraform-infrastructure
+  - name: neighborly-server-dev
     plan:
       - get: git
         trigger: true
@@ -47,12 +64,12 @@ jobs:
         config:
           platform: linux
           image_resource:
-            type: registry-image
+            type: docker-image
             source:
               repository: node
               username: ((DOCKER_USER))
               password: ((DOCKER_PASS))
-              tag: alpine
+              tag: 14.15.1-alpine3.11
           inputs:
             - name: git
           outputs:
@@ -113,5 +130,54 @@ jobs:
                 # rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
                 #   -arvz --delete ./ ec2-user@$public_ip
                 # ssh -i ./key_file -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
-
+  - name: neighborly-server-staging
+    plan:
+      - get: s3
+        passed: [neighborly-server-dev]
+      - put: terraform-resource-staging
+        params:
+          terraform_source: git/ci/terraform-staging/             
+      - task: deploy      
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+          inputs:
+            - name: s3
+              path: .
+            - name: terraform-resource-staging
+          params:
+            SERVER_KEY: ((server_private_key))
+          run:
+            path: /bin/sh
+            args:
+              - -c
+              - |
+                apt-get update && apt-get -y install rsync jq openssh-client
+                # DEBIAN_FRONTEND=noninteractive apt-get -y install awscli
+                export public_ip=$(cat terraform-resource/metadata | jq -r .public_ip)
+                echo "$SERVER_KEY" > key_file
+                chmod 400 key_file                                               
+                ls -la
+                pwd
+                # rsync --progress -rave "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
+                # ./neighborly-server.tar.gz ec2-user@$public_ip:/home/ec2-user/neighborly-server.tar.gz
+                # ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip sudo mkdir -p /var/www/neighborly.tools/server
+                # ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip sudo tar xzf /home/ec2-user/neighborly-server.tar.gz -C /var/www/neighborly.tools/server/
+                # ssh -i key_file -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@$public_ip sudo sh /var/www/neighborly.tools/ci/start.sh
+                
+                # aws ec2-instance-connect send-ssh-public-key \
+                #   --region $AWS_REGION \
+                #   --instance-id $AWS_INSTANCE_ID \
+                #   --availability-zone $AWS_AVAILABILITY_ZONE \
+                #   --instance-os-user $AWS_INSTANCE_OS_USER \
+                #   --ssh-public-key ./key-file &&
+                # rsync --progress -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./key_file" \
+                #   -arvz --delete ./ ec2-user@$public_ip
+                # ssh -i ./key_file -o StrictHostKeyChecking=no ec2-user@$public_ip bash -c "'sudo supervisorctl restart neighborly:*'"
+      - put: staging-build
+        params:
+          file: server/neighborly-server-staging.tar.gz
   
